@@ -31,7 +31,7 @@ export default defineConfig({
         APP_ORIGIN: "",
         SUPABASE_URL: "",
         SUPABASE_PUBLISHABLE_KEY: "",
-        SUPABASE_SERVICE_ROLE_KEY: "",
+        SUPABASE_SECRET_KEY: "",
         RATE_LIMIT_SECRET: "",
       },
     },

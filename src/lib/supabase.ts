@@ -24,7 +24,7 @@ export async function serverSupabase() {
 
 export function adminSupabase() {
   const cfg = config();
-  return createClient(cfg.url, cfg.serviceKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch } });
+  return createClient(cfg.url, cfg.secretKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch } });
 }
 
 export async function reauthenticate(email: string, password: string, userId: string) {

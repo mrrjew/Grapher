@@ -11,7 +11,7 @@ npm ci
 Copy-Item .env.example .env.local
 ```
 
-Fill in `.env.local` with your own Supabase project values and a long random `RATE_LIMIT_SECRET`. Set `APP_ORIGIN` to `http://127.0.0.1:3000` for local development and open that exact address. Origin checks deliberately distinguish `localhost` from `127.0.0.1`. Keep the service-role key and rate-limit secret on the server. Never use a `NEXT_PUBLIC_` prefix for either key.
+Fill in `.env.local` with your own Supabase project values and a long random `RATE_LIMIT_SECRET`. Set `APP_ORIGIN` to `http://127.0.0.1:3000` for local development and open that exact address. Origin checks deliberately distinguish `localhost` from `127.0.0.1`. Use a new `sb_publishable_...` key for `SUPABASE_PUBLISHABLE_KEY` and an `sb_secret_...` key for `SUPABASE_SECRET_KEY`. Keep the secret key and rate-limit secret on the server. Never use a `NEXT_PUBLIC_` prefix for either secret.
 
 Install the Supabase CLI, link your project and apply the migration:
 
@@ -51,6 +51,12 @@ Every protected request checks the authenticated user, confirmed email and `curr
 The migration enables row-level security on application tables and denies ordinary users access to internal security records. Phase 0 does not create graph, entitlement or payment tables. Future graph rows must reference `auth.users` with `ON DELETE CASCADE`; entitlements must never be writable by browser clients. Deletion targets the server-verified account and requires password reauthentication.
 
 Do not log passwords, cookies, email tokens, recovery URLs or environment values. Treat provider and hosting logs as sensitive operational data.
+
+### API key migration
+
+In Supabase **Settings → API Keys → Publishable and secret API keys**, create or copy your new keys. Set `SUPABASE_PUBLISHABLE_KEY=sb_publishable_...` and `SUPABASE_SECRET_KEY=sb_secret_...` in your ignored `.env.local` and the appropriate Vercel environment. Remove the previous legacy server-key setting; there is no fallback to legacy JWT API keys. Restart the local server or redeploy after changing environment settings.
+
+Verify signup, verification, login, recovery, password change, persistent rate limiting and account deletion using the new keys. Only then disable legacy API keys in Supabase. Key replacement does not require changing database roles, RLS policies or user session JWTs. The new secret key still bypasses RLS and must remain server-only. See [Supabase's migration guide](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys).
 
 ## Checks
 
@@ -97,7 +103,7 @@ These tests exercise database permissions, the rate limiter and authoritative se
 
 1. Put this project in a private Git repository and connect it to Vercel using its Next.js preset. Keep the committed lockfile and use `npm ci` for installation.
 2. Create a separate Supabase project for production. Apply the migration and all Auth settings above. Never point arbitrary preview deployments at production user data.
-3. Configure `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RATE_LIMIT_SECRET` and `APP_ORIGIN` in Vercel. Use the exact HTTPS application origin, with no trailing path. Use separate values for preview and production environments.
+3. Configure `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `RATE_LIMIT_SECRET` and `APP_ORIGIN` in Vercel. Use the exact HTTPS application origin, with no trailing path. Use separate values for preview and production environments.
 4. Deploy from the connected repository. The included GitHub workflow runs type checks, unit tests, the production build, dependency auditing and browser smoke checks. Configure repository branch protection to require the workflow before merging; enable Vercel's deployment checks so production waits for required CI.
 5. Complete the hosted acceptance checklist. Check email links, HTTPS cookies, expired sessions, throttling and account deletion. Record the results before allowing students to sign up.
 
