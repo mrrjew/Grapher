@@ -18,6 +18,37 @@ async function fillRow(page: Page, row: number, x: string, y: string) {
   await page.getByLabel(`Row ${row}, y value`, { exact: true }).fill(y);
 }
 
+test("validates edited graph fields before submit and keeps unrelated errors", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const title = page.getByLabel("Graph title", { exact: true });
+  const xValue = page.getByLabel("Row 1, x value", { exact: true });
+  const yValue = page.getByLabel("Row 1, y value", { exact: true });
+  const boxes = page.getByLabel("X grid boxes", { exact: true });
+  await expect(title).toHaveAttribute("aria-invalid", "false");
+  await title.focus();
+  await title.blur();
+  await expect(title).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#error-title")).toHaveText("Enter a graph title.");
+  await xValue.fill("not a number");
+  await expect(xValue).toHaveAttribute("aria-invalid", "true");
+  await expect(yValue).toHaveAttribute("aria-invalid", "false");
+  await boxes.fill("1");
+  await expect(boxes).toHaveAttribute("aria-invalid", "true");
+  await title.fill("My graph");
+  await expect(title).toHaveAttribute("aria-invalid", "false");
+  await expect(xValue).toHaveAttribute("aria-invalid", "true");
+  await expect(boxes).toHaveAttribute("aria-invalid", "true");
+  await xValue.fill("2,5");
+  await expect(xValue).toHaveAttribute("aria-invalid", "false");
+  await expect(boxes).toHaveAttribute("aria-invalid", "true");
+  await boxes.fill("10");
+  await expect(boxes).toHaveAttribute("aria-invalid", "false");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("img")).toHaveCount(0);
+});
+
 test("shows hand-worked scales and plotted points on a narrow screen", async ({
   page,
 }, testInfo) => {
@@ -380,37 +411,72 @@ test("a failed preview can be retried without editing or losing the table", asyn
   expect(errors).toEqual([]);
 });
 
-test("edits in a real second tab update the first tab with the last stored values", async ({ page, context }) => {
+test("edits in a real second tab update the first tab with the last stored values", async ({
+  page,
+  context,
+}) => {
   await page.goto("/");
   await fillGraphDetails(page);
   await fillRow(page, 1, "1", "2");
   const second = await context.newPage();
   await second.goto("http://127.0.0.1:3001/");
-  await expect(second.getByLabel("Graph title", { exact: true })).toHaveValue("Extension against force");
-  await second.getByLabel("Graph title", { exact: true }).fill("Last edit from the second tab");
+  await expect(second.getByLabel("Graph title", { exact: true })).toHaveValue(
+    "Extension against force",
+  );
+  await second
+    .getByLabel("Graph title", { exact: true })
+    .fill("Last edit from the second tab");
   await second.getByLabel("Row 1, y value", { exact: true }).fill("9");
-  await expect(page.getByLabel("Graph title", { exact: true })).toHaveValue("Last edit from the second tab");
-  await expect(page.getByLabel("Row 1, y value", { exact: true })).toHaveValue("9");
-  await expect(page.getByRole("status").filter({ hasText: /another tab/i })).toBeVisible();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("physics-graph-draft:v1:test-student")!).rows[0].y)).toBe("9");
+  await expect(page.getByLabel("Graph title", { exact: true })).toHaveValue(
+    "Last edit from the second tab",
+  );
+  await expect(page.getByLabel("Row 1, y value", { exact: true })).toHaveValue(
+    "9",
+  );
+  await expect(
+    page.getByRole("status").filter({ hasText: /another tab/i }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("physics-graph-draft:v1:test-student")!)
+          .rows[0].y,
+    ),
+  ).toBe("9");
 });
 
-test("a successful logout through the real account form removes the draft in both tabs", async ({ page, context }) => {
-  await context.route("http://127.0.0.1:3001/api/auth/logout", route => route.fulfill({
-    contentType: "application/json", body: JSON.stringify({ redirect: "/login" }),
-  }));
+test("a successful logout through the real account form removes the draft in both tabs", async ({
+  page,
+  context,
+}) => {
+  await context.route("http://127.0.0.1:3001/api/auth/logout", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ redirect: "/login" }),
+    }),
+  );
   await page.goto("/");
   await fillGraphDetails(page);
   await fillRow(page, 1, "1", "2");
   const second = await context.newPage();
   await second.goto("http://127.0.0.1:3001/");
-  await expect(second.getByLabel("Graph title", { exact: true })).toHaveValue("Extension against force");
+  await expect(second.getByLabel("Graph title", { exact: true })).toHaveValue(
+    "Extension against force",
+  );
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page).toHaveURL("http://127.0.0.1:3001/login");
   await expect(second).toHaveURL("http://127.0.0.1:3001/login");
   for (const tab of [page, second]) {
-    expect(await tab.evaluate(() => localStorage.getItem("physics-graph-draft:v1:test-student"))).toBeNull();
-    await expect(tab.getByLabel("Graph title", { exact: true })).toHaveValue("");
-    await expect(tab.getByLabel("Row 1, x value", { exact: true })).toHaveValue("");
+    expect(
+      await tab.evaluate(() =>
+        localStorage.getItem("physics-graph-draft:v1:test-student"),
+      ),
+    ).toBeNull();
+    await expect(tab.getByLabel("Graph title", { exact: true })).toHaveValue(
+      "",
+    );
+    await expect(tab.getByLabel("Row 1, x value", { exact: true })).toHaveValue(
+      "",
+    );
   }
 });

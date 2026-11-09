@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { authenticatedUser } from '@/lib/supabase';
 import { configured } from '@/lib/config';
 import { AuthForm } from './auth-form';
+import { emailVerificationRequired } from '@/lib/auth-settings';
 
 type Mode = 'login' | 'signup' | 'forgot-password' | 'resend';
 const content = {
@@ -14,11 +15,16 @@ const content = {
 
 export async function AuthPage({ mode, notice }: { mode: Mode; notice?: string }) {
   const ready = configured();
+  const verificationRequired = emailVerificationRequired();
   if (ready) {
     const auth = await authenticatedUser();
     if (auth) redirect('/workspace');
   }
-  const item = content[mode];
+  const item = !verificationRequired && mode === 'signup'
+    ? { title: 'Create an account', description: 'Enter your email and password. Your workspace will open after signup.' }
+    : !verificationRequired && mode === 'login'
+      ? { title: 'Log in', description: 'Enter your email and password to open your workspace.' }
+      : content[mode];
   return <main id="main" className="auth-layout">
     <section className="introduction" aria-labelledby="intro-title">
       <p className="eyebrow">For the practical lab</p>
@@ -34,7 +40,7 @@ export async function AuthPage({ mode, notice }: { mode: Mode; notice?: string }
       {notice === 'password-updated' && <p className="message" role="status">Your password has changed. Log in with your new password.</p>}
       <AuthForm mode={mode} disabled={!ready} />
       <nav className="auth-links" aria-label="Account help">
-        {mode === 'login' ? <><Link href="/signup">Create an account</Link><Link href="/forgot-password">Forgot password?</Link><Link href="/resend-verification">Resend verification email</Link></> : <Link href="/login">Back to log in</Link>}
+        {mode === 'login' ? <><Link href="/signup">Create an account</Link><Link href="/forgot-password">Forgot password?</Link>{verificationRequired && <Link href="/resend-verification">Resend verification email</Link>}</> : <Link href="/login">Back to log in</Link>}
       </nav>
       {['forgot-password', 'resend'].includes(mode) && <p className="hint email-note">Emails may take a few minutes. Check your spam folder. You can request another link after one minute.</p>}
     </section>

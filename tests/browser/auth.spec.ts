@@ -8,6 +8,10 @@ test('logged-out students cannot open the workspace or reset password page', asy
   await page.screenshot({ path: testInfo.outputPath('login.png'), fullPage: true });
   await page.goto('/reset-password');
   await expect(page).toHaveURL(/\/forgot-password$/);
+  await page.goto('/upgrade');
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto('/payments/return?reference=graphbook-test');
+  await expect(page).toHaveURL(/\/login$/);
 });
 
 test('account forms are labeled, navigable and fit a phone screen', async ({ page }) => {

@@ -2,17 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { clearDraft } from "@/lib/graph-draft";
+import { authFieldErrors, type AuthMode } from "@/lib/validation";
 
-type Mode =
-  | "login"
-  | "signup"
-  | "forgot-password"
-  | "resend"
-  | "confirm"
-  | "reset-password"
-  | "change-password"
-  | "delete-account"
-  | "logout";
+type Mode = AuthMode;
 const labels: Record<Mode, string> = {
   login: "Log in",
   signup: "Create account",
@@ -43,6 +35,16 @@ export function AuthForm({
   const [failed, setFailed] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const messageRef = useRef<HTMLParagraphElement>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const touched = useRef(new Set<string>());
+  const submitted = useRef(false);
+  const resetting = useRef(false);
+  useEffect(() => {
+    if (message && !pending) {
+      messageRef.current?.focus();
+      resetting.current = false;
+    }
+  }, [message, pending]);
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
@@ -55,9 +57,63 @@ export function AuthForm({
   const currentPassword = ["change-password", "delete-account"].includes(mode);
   const id = (name: string) => `${mode}-${name}`;
 
+  function validateFields(form: HTMLFormElement, all = false) {
+    const errors = authFieldErrors(
+      mode,
+      Object.fromEntries(new FormData(form)),
+    );
+    setFieldErrors(
+      Object.fromEntries(
+        Object.entries(errors).filter(
+          ([name]) => all || submitted.current || touched.current.has(name),
+        ),
+      ),
+    );
+    return errors;
+  }
+
+  function fieldChanged(
+    event: React.FormEvent<HTMLFormElement> | React.FocusEvent<HTMLFormElement>,
+  ) {
+    const input = event.target;
+    if (resetting.current) return;
+    if (!(input instanceof HTMLInputElement) || !input.name) return;
+    touched.current.add(input.name);
+    validateFields(event.currentTarget);
+    if (event.type === "change") setMessage("");
+  }
+
+  function feedback(name: string) {
+    return fieldErrors[name] ? (
+      <p className="field-error" id={id(`${name}-error`)} aria-live="polite">
+        {fieldErrors[name]}
+      </p>
+    ) : null;
+  }
+
+  function accessibility(name: string, help?: string) {
+    return {
+      "aria-invalid": Boolean(fieldErrors[name]),
+      "aria-describedby":
+        [help, fieldErrors[name] ? id(`${name}-error`) : undefined]
+          .filter(Boolean)
+          .join(" ") || undefined,
+    };
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    submitted.current = true;
+    const errors = validateFields(form, true);
+    if (Object.keys(errors).length) {
+      (
+        form.elements.namedItem(
+          Object.keys(errors)[0],
+        ) as HTMLInputElement | null
+      )?.focus();
+      return;
+    }
     const values = Object.fromEntries(new FormData(form));
     if (tokenHash) values.token_hash = tokenHash;
     if (tokenType) values.type = tokenType;
@@ -94,7 +150,13 @@ export function AuthForm({
       );
       if (result.cooldown || response.status === 429)
         setCooldown(result.cooldown || 60);
-      if (response.ok) form.reset();
+      if (response.ok) {
+        resetting.current = true;
+        form.reset();
+        setFieldErrors({});
+        touched.current.clear();
+        submitted.current = false;
+      }
     } catch {
       setFailed(true);
       setMessage(
@@ -102,13 +164,15 @@ export function AuthForm({
       );
     } finally {
       setPending(false);
-      setTimeout(() => messageRef.current?.focus(), 0);
     }
   }
 
   return (
     <form
       onSubmit={submit}
+      onChange={fieldChanged}
+      onBlur={fieldChanged}
+      noValidate
       className={mode === "logout" ? "logout-form" : "auth-form"}
       aria-busy={pending}
     >
@@ -124,7 +188,9 @@ export function AuthForm({
             required
             autoCapitalize="none"
             spellCheck={false}
+            {...accessibility("email")}
           />
+          {feedback("email")}
         </div>
       )}
       {currentPassword && (
@@ -137,7 +203,9 @@ export function AuthForm({
             autoComplete="current-password"
             maxLength={128}
             required
+            {...accessibility("currentPassword")}
           />
+          {feedback("currentPassword")}
         </div>
       )}
       {(mode === "login" || newPassword) && (
@@ -157,9 +225,13 @@ export function AuthForm({
                 ? "(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{12,128}"
                 : undefined
             }
-            aria-describedby={newPassword ? id("rules") : undefined}
+            {...accessibility(
+              "password",
+              newPassword ? id("rules") : undefined,
+            )}
             required
           />
+          {feedback("password")}
           {newPassword && (
             <p className="hint" id={id("rules")}>
               Use 12–128 characters, with an uppercase letter, a lowercase
@@ -179,7 +251,9 @@ export function AuthForm({
             minLength={12}
             maxLength={128}
             required
+            {...accessibility("confirmPassword")}
           />
+          {feedback("confirmPassword")}
         </div>
       )}
       {mode === "delete-account" && (
@@ -195,7 +269,9 @@ export function AuthForm({
               autoComplete="off"
               pattern="DELETE"
               required
+              {...accessibility("confirmation")}
             />
+            {feedback("confirmation")}
           </div>
         </>
       )}

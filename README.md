@@ -1,6 +1,6 @@
 # Physics Graph Helper
 
-A learning aid for university physics practicals. Phase 0 provides the account foundation. Phase 1 adds the graph helper: a data table, step-by-step axis scaling, a Chart.js point preview and local draft recovery. Saved graphs, report guidance and payments remain in Phase 2.
+A learning aid for university physics practicals. Includes verified accounts, step-by-step graph scaling, graph previews, saved graphs, static report guidance and a Paystack test-mode semester pass. There are no AI features, admin accounts or recurring subscriptions.
 
 ## Run locally
 
@@ -13,7 +13,7 @@ Copy-Item .env.example .env.local
 
 Fill in `.env.local` with your own Supabase project values and a long random `RATE_LIMIT_SECRET`. Set `APP_ORIGIN` to `http://127.0.0.1:3000` for local development and open that exact address. Origin checks deliberately distinguish `localhost` from `127.0.0.1`. Use a new `sb_publishable_...` key for `SUPABASE_PUBLISHABLE_KEY` and an `sb_secret_...` key for `SUPABASE_SECRET_KEY`. Keep the secret key and rate-limit secret on the server. Never use a `NEXT_PUBLIC_` prefix for either secret.
 
-Install the Supabase CLI, link your project and apply the migration:
+Install the Supabase CLI, link your project and apply the migrations:
 
 ```powershell
 supabase login
@@ -22,7 +22,7 @@ supabase db push
 npm run dev
 ```
 
-The application requires the migration as well as the provider settings below. Authentication fails closed if its persistent security checks are unavailable. No mock account or development bypass grants access.
+The application requires both migrations as well as the provider settings below. Authentication fails closed if its persistent security checks are unavailable. No mock account or development bypass grants access. If applying SQL manually, run `202611070001_phase0_security.sql` once first, then `202611070002_phase2_graphs_and_payments.sql` once. Do not rerun a migration already applied through the dashboard.
 
 ## Configure hosted Supabase
 
@@ -40,6 +40,12 @@ These dashboard settings are required; applying SQL migrations alone does not co
 
 The supplied email templates are in `supabase/templates`. The confirmation landing page requires an explicit POST before consuming the link, so an ordinary GET from an email scanner does not consume it.
 
+### Temporary signup without email confirmation
+
+The current local setup opts out with `AUTH_REQUIRE_EMAIL_VERIFICATION=false` in ignored `.env.local`; the local Supabase CLI configuration also has `auth.email.enable_confirmations=false`. For a hosted project, turn **Confirm email** off in Supabase's email authentication settings as well. The app cannot change that hosted setting with an API key. Supabase then auto-confirms new signups and returns a session, which opens the workspace directly. No SQL migration is needed; existing session, ownership and payment checks remain active.
+
+To restore verification, set `AUTH_REQUIRE_EMAIL_VERIFICATION=true` and turn **Confirm email** back on in Supabase (or set `enable_confirmations=true` for the local CLI stack). `.env.example` keeps the verification-on default. Restart/redeploy after changes. Disabling confirmation means new users have not proved control of their email address. Existing auto-confirmed accounts are not retroactively verified by re-enabling the setting.
+
 ## Security boundaries
 
 Authentication runs on the server through Supabase. Session cookies are HttpOnly, SameSite=Lax and Secure in production. Tokens are not stored in browser local storage. Mutations require the configured same origin, and authenticated responses must not enter shared caches.
@@ -48,7 +54,7 @@ Every protected request checks the authenticated user, confirmed email and `curr
 
 `consume_rate_limit()` uses atomic, persistent database buckets. Only the server's service role can execute it. Bucket identifiers are keyed hashes rather than raw email or IP addresses. An unavailable limiter blocks the auth request rather than allowing unrestricted retries. On Vercel the application uses the platform's trusted client-IP header; keep Vercel as the direct public ingress.
 
-The migration enables row-level security on application tables and denies ordinary users access to internal security records. Phase 0 does not create graph, entitlement or payment tables. Future graph rows must reference `auth.users` with `ON DELETE CASCADE`; entitlements must never be writable by browser clients. Deletion targets the server-verified account and requires password reauthentication.
+Migrations enable RLS on every application table. Saved graphs, entitlements, checkout attempts and known-user payment logs cascade on account deletion. Raw financial event payloads are server-only; events without a known account retain only minimal operational fields. Browser roles cannot write entitlements or payment attempts. Graph writes go through an authenticated SQL function that locks per account, enforces free/paid limits and applies a persistent successful-write quota. The API separately limits save attempts. Deletion targets the server-verified account and requires password reauthentication.
 
 Do not log passwords, cookies, email tokens, recovery URLs or environment values. Treat provider and hosting logs as sensitive operational data.
 
@@ -97,7 +103,23 @@ supabase start
 supabase test db
 ```
 
-These tests exercise database permissions, the rate limiter and authoritative session checks. The implementation machine did not have the local Supabase/Docker stack available, so a successful SQL test run must be confirmed in CI or on a configured development machine.
+These tests exercise database permissions, rate limits, authoritative sessions, graph ownership, atomic limits and payment idempotency/refunds. Equivalent assertions were also executed in isolated PGlite PostgreSQL with a simulated Auth schema. That check does not replace the real Supabase/pgTAP run, which still requires Docker or CI.
+
+## Paystack test setup
+
+1. Keep the approved placeholders in `src/lib/semester.ts`: GHS 50 (`5000` minor units), expiry `2026-12-31T23:59:59.000Z`. Price display is derived from those settings. This is the only price/currency/semester configuration file.
+2. Put your Paystack **test** secret in `PAYSTACK_SECRET_KEY` in ignored `.env.local` and your staging Vercel settings. Live keys are deliberately rejected.
+3. Set the test webhook URL to `https://YOUR-STAGING-ORIGIN/api/payments/webhook`. Checkout sets its callback to `/payments/return` on `APP_ORIGIN`. Restart or redeploy after environment changes.
+4. If your integration has a new webhook signing secret, set `PAYSTACK_WEBHOOK_SECRET=whsec_...`. It enables timestamped `Paystack-Signature` verification with a five-minute tolerance. Otherwise the older `x-paystack-signature` HMAC is supported with the test API secret. When the new secret is set there is no fallback after a missing/invalid new signature.
+5. Complete [Phase 2 hosted acceptance](docs/phase-2-acceptance.md). Use provider test checkout details only; never enter a real card for test verification.
+
+Checkout stores the verified owner, reference, amount, currency, plan and expiry before contacting Paystack. The webhook authenticates raw bytes and verifies the transaction with Paystack before an atomic database function can grant access. A unique reference prevents duplicate entitlements and expiry extension. Verification outages and pending provider states return retryable failures without consuming the actual event's idempotency key. The browser return page polls for about 20–25 seconds; neither it nor status polling can grant access.
+
+Free accounts can keep one saved graph. Paid accounts can save and reload unlimited graphs through a paginated list. Saving uses a persistent graph ID so a timeout or refresh can retry without making another graph. On expiry or a processed refund, the oldest graph remains available on the free plan; additional saved graphs stay stored until a new pass restores access or the account is deleted. Any verified processed refund, including a partial refund, revokes the pass for that reference. Refunds are managed in Paystack, not an admin page in this app.
+
+Full report-guide content lives in `src/content/report-guide.ts` and is rendered only after the server checks paid access. The video URL remains unset. `/terms` and `/refunds` contain draft test policies. Live wording and the contact channel must be confirmed before launch.
+
+Structured payment/error logs include operation and correlation IDs without secrets, emails or raw payloads. `/api/health` returns database readiness without exposing configuration. An external uptime monitor and alert destination still need to be configured in your hosting/monitoring account; code alone does not create those services. See [the live-switch checklist](docs/paystack-live-checklist.md) before any Phase 3 work.
 
 ## Deploy to Vercel
 
@@ -113,7 +135,7 @@ No hosted project is created or deployed by merely running the local build. Supa
 
 - Phase 0: account foundation, database security, deployment pipeline and empty logged-in workspace.
 - Phase 1: graph inputs, scaling maths, tests, preview and browser draft recovery. No saving or payments.
-- Phase 2, after approval: confirmed free/paid split, Paystack test checkout/webhooks, saved graphs and report content. Price, currency, semester dates and video link remain to be supplied.
+- Phase 2: Paystack test checkout/webhooks, saving/reloading, report content, draft policies and monitoring hooks. Test price/date placeholders are configured; real values and video remain to be supplied.
 - Phase 3, only after explicit approval: live payments, final legal wording, analytics and feedback fixes.
 
 Each phase needs the owner's approval before coding starts. No AI features are part of this application.

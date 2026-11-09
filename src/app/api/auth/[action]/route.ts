@@ -4,6 +4,7 @@ import { adminSupabase, authenticatedUser, clearAuthCookies, reauthenticate, ser
 import { confirmationValues, emailValue, InputError, passwordValue, sameOrigin } from '@/lib/validation';
 import { rateLimit, RateLimitError } from '@/lib/rate-limit';
 import { hasRecovery, setRecovery } from '@/lib/recovery';
+import { emailVerificationRequired } from '@/lib/auth-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,8 +52,17 @@ export async function POST(request: Request, context: { params: Promise<{ action
       const password = passwordValue(data.password);
       if (data.password !== data.confirmPassword) throw new InputError('The passwords do not match. Enter them again.');
       const { data: result, error } = await client.auth.signUp({ email: email!, password, options: { emailRedirectTo: `${config().origin}/auth/confirm` } });
-      // A session here means the provider incorrectly allows unverified signup.
-      if (result.session) { await client.auth.signOut({ scope: 'local' }); await clearAuthCookies(); return reply({ message: 'Email verification is not configured. Please contact the app owner.' }, 503); }
+      if (result.session) {
+        // Confirm email OFF makes Supabase auto-confirm and issue the session.
+        // Accept it only when the matching app opt-out has been explicitly set.
+        if (!error && !emailVerificationRequired() && result.user?.email_confirmed_at) return reply({ redirect: '/workspace' });
+        await client.auth.signOut({ scope: 'local' }); await clearAuthCookies();
+        return reply({ message: 'Email verification is not configured. Please contact the app owner.' }, 503);
+      }
+      if (!emailVerificationRequired()) {
+        if (error) return reply({ message: 'We could not create the account. Check your details, or log in if you already have an account.' }, 400);
+        return reply({ message: 'Email confirmation is still enabled in the account service. Please ask the app owner to finish the signup setup.' }, 503);
+      }
       if (error && !['user_already_exists', 'email_exists'].includes(error.code ?? '')) return reply({ message: 'We could not create the account right now. Check the password rules and try again later.' }, 400);
       return reply({ message: messageSent, cooldown: 60 });
     }

@@ -47,7 +47,7 @@ token_verifications = 30
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
-enable_confirmations = true
+enable_confirmations = false
 secure_password_change = true
 max_frequency = "1m"
 otp_length = 8

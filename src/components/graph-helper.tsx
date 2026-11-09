@@ -13,6 +13,7 @@ import {
 import { scaleAxis, formatNumber as n, type AxisScale } from "@/lib/scaling";
 import { GraphPreview } from "./graph-preview";
 import "./graph-helper.css";
+import { SavedGraphs } from "./saved-graphs";
 
 type Result = { x: AxisScale; y: AxisScale; points: Point[] };
 const axisLabel = (label: string, unit: string) =>
@@ -90,7 +91,13 @@ function AxisWorking({
   );
 }
 
-export function GraphHelper({ userId }: { userId: string }) {
+export function GraphHelper({
+  userId,
+  savingEnabled = false,
+}: {
+  userId: string;
+  savingEnabled?: boolean;
+}) {
   const [draft, setDraft] = useState<GraphDraft>(emptyDraft);
   const [ready, setReady] = useState(false);
   const [draftMessage, setDraftMessage] = useState("");
@@ -99,8 +106,41 @@ export function GraphHelper({ userId }: { userId: string }) {
   const summary = useRef<HTMLDivElement>(null);
   const results = useRef<HTMLDivElement>(null);
   const ended = useRef(false);
+  const touched = useRef(new Set<string>());
+  const submitted = useRef(false);
+
+  function validationErrors(next: GraphDraft): FieldError[] {
+    const validated = validateGraph(next);
+    const visible = validated.errors.filter(
+      (error) => submitted.current || touched.current.has(error.field),
+    );
+    if (submitted.current && validated.errors.length === 0) {
+      for (const axis of ["x", "y"] as const) {
+        try {
+          scaleAxis(
+            validated.points.map((point) => point[axis]),
+            validated[`${axis}Boxes`],
+          );
+        } catch (error) {
+          visible.push({
+            field: `${axis}Boxes`,
+            message: `${axis.toUpperCase()} axis: ${(error as Error).message}`,
+          });
+        }
+      }
+    }
+    return visible;
+  }
+
+  function touch(fieldId: string) {
+    touched.current.add(fieldId);
+    setErrors(validationErrors(draft));
+  }
 
   useEffect(() => {
+    touched.current.clear();
+    submitted.current = false;
+    setErrors([]);
     try {
       const saved = loadDraft(userId);
       if (saved) {
@@ -115,6 +155,8 @@ export function GraphHelper({ userId }: { userId: string }) {
     setReady(true);
     function endSession(navigate = true) {
       ended.current = true;
+      touched.current.clear();
+      submitted.current = false;
       setDraft(emptyDraft());
       setResult(null);
       setErrors([]);
@@ -139,6 +181,8 @@ export function GraphHelper({ userId }: { userId: string }) {
           return;
         }
         setDraft(latest);
+        touched.current.clear();
+        submitted.current = false;
         setErrors([]);
         setResult(null);
         setDraftMessage(
@@ -161,11 +205,12 @@ export function GraphHelper({ userId }: { userId: string }) {
     };
   }, [userId]);
 
-  function update(next: GraphDraft) {
+  function update(next: GraphDraft, changedField?: string) {
     if (ended.current) return;
+    if (changedField) touched.current.add(changedField);
     setDraft(next);
     setResult(null);
-    setErrors([]);
+    setErrors(validationErrors(next));
     try {
       storeDraft(userId, next);
       setDraftMessage("Draft kept on this browser.");
@@ -191,7 +236,10 @@ export function GraphHelper({ userId }: { userId: string }) {
           name={key}
           value={draft[key]}
           maxLength={maxLength}
-          onChange={(event) => update({ ...draft, [key]: event.target.value })}
+          onChange={(event) =>
+            update({ ...draft, [key]: event.target.value }, key)
+          }
+          onBlur={() => touch(key)}
           aria-invalid={Boolean(error)}
           aria-describedby={
             error ? `error-${key}` : help ? `help-${key}` : undefined
@@ -214,6 +262,7 @@ export function GraphHelper({ userId }: { userId: string }) {
 
   function calculate(event: React.FormEvent) {
     event.preventDefault();
+    submitted.current = true;
     const validated = validateGraph(draft);
     if (validated.errors.length) {
       setErrors(validated.errors);
@@ -281,6 +330,18 @@ export function GraphHelper({ userId }: { userId: string }) {
           {draftMessage || "Your table is ready."}
         </p>
       </div>
+      {savingEnabled && (
+        <SavedGraphs
+          userId={userId}
+          draft={draft}
+          onLoad={(next) => {
+            touched.current.clear();
+            submitted.current = false;
+            update(next);
+            setErrors([]);
+          }}
+        />
+      )}
       <form onSubmit={calculate} noValidate>
         <section
           className="graph-section"
@@ -360,15 +421,19 @@ export function GraphHelper({ userId }: { userId: string }) {
                             value={row[axis]}
                             maxLength={80}
                             onChange={(event) =>
-                              update({
-                                ...draft,
-                                rows: draft.rows.map((item) =>
-                                  item.id === row.id
-                                    ? { ...item, [axis]: event.target.value }
-                                    : item,
-                                ),
-                              })
+                              update(
+                                {
+                                  ...draft,
+                                  rows: draft.rows.map((item) =>
+                                    item.id === row.id
+                                      ? { ...item, [axis]: event.target.value }
+                                      : item,
+                                  ),
+                                },
+                                fieldId,
+                              )
                             }
+                            onBlur={() => touch(fieldId)}
                           />
                           {error && (
                             <p className="field-error" id={`error-${fieldId}`}>
@@ -440,7 +505,7 @@ export function GraphHelper({ userId }: { userId: string }) {
             {field("yBoxes", "Y grid boxes", 3)}
           </div>
         </section>
-        {errors.length > 0 && (
+        {submitted.current && errors.length > 0 && (
           <div
             className="graph-errors"
             ref={summary}

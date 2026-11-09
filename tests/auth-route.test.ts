@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   ready: true,
@@ -20,6 +20,7 @@ function request(action: string, data: Record<string, unknown> = {}, origin = mo
 
 beforeEach(() => {
   vi.resetAllMocks(); mocks.ready = true;
+  vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'true');
   mocks.rateLimit.mockResolvedValue(undefined);
   mocks.authenticatedUser.mockResolvedValue({ user, client: mocks.client });
   mocks.reauthenticate.mockResolvedValue(true);
@@ -29,8 +30,28 @@ beforeEach(() => {
   mocks.client.auth.getClaims.mockResolvedValue({ data: { claims: { session_id: 'session-1' } } });
   mocks.deleteUser.mockResolvedValue({ error: null });
 });
+afterEach(() => vi.unstubAllEnvs());
 
 describe('server authentication boundaries', () => {
+  it('opens the workspace when direct signup is explicitly enabled and Supabase auto-confirms', async () => {
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'false');
+    mocks.client.auth.signUp.mockResolvedValue({ data: { user, session: {} }, error: null });
+    const response = await request('signup', { email: user.email, password: 'GoodPassword123', confirmPassword: 'GoodPassword123' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ redirect: '/workspace' });
+    expect(mocks.client.auth.signOut).not.toHaveBeenCalled();
+  });
+  it('does not pretend direct signup worked when Supabase confirmation is still enabled', async () => {
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'false');
+    mocks.client.auth.signUp.mockResolvedValue({ data: { user: { ...user, email_confirmed_at: null }, session: null }, error: null });
+    expect((await request('signup', { email: user.email, password: 'GoodPassword123', confirmPassword: 'GoodPassword123' })).status).toBe(503);
+  });
+  it('does not accept an unconfirmed identity even with the direct-signup opt-out', async () => {
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'false');
+    mocks.client.auth.signUp.mockResolvedValue({ data: { user: { ...user, email_confirmed_at: null }, session: {} }, error: null });
+    expect((await request('signup', { email: user.email, password: 'GoodPassword123', confirmPassword: 'GoodPassword123' })).status).toBe(503);
+    expect(mocks.clearAuthCookies).toHaveBeenCalled();
+  });
   it('rejects cross-origin requests before provider or limiter calls', async () => {
     expect((await request('login', { email: user.email, password: 'password' }, 'https://evil.test')).status).toBe(403);
     expect(mocks.rateLimit).not.toHaveBeenCalled(); expect(mocks.client.auth.signInWithPassword).not.toHaveBeenCalled();

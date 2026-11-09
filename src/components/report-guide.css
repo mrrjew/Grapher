@@ -1,0 +1,123 @@
+.report-guide {
+  margin: var(--space-12) 0;
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--line);
+}
+
+.report-guide h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  margin-bottom: var(--space-4);
+}
+
+.report-intro {
+  max-width: 720px;
+  color: var(--muted);
+}
+
+.report-sections {
+  margin-top: var(--space-8);
+}
+
+.report-sections summary {
+  padding: var(--space-4) var(--space-2);
+}
+
+.report-section-content {
+  max-width: 760px;
+  padding: var(--space-2) var(--space-2) var(--space-6);
+  overflow-wrap: anywhere;
+}
+
+.report-section-content h3,
+.report-video-slot h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+.report-section-content h3:first-child {
+  margin-top: 0;
+}
+
+.report-section-content p,
+.report-section-content blockquote,
+.report-video-slot p {
+  font-size: 0.95rem;
+}
+
+.report-section-content blockquote {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: #eef1eb;
+  border-left: 2px solid #8b978d;
+}
+
+.report-video-slot {
+  margin-top: var(--space-8);
+  padding: var(--space-4) var(--space-6);
+  border: 1px dashed #9ba69c;
+}
+
+.report-video-slot h3 {
+  margin-top: 0;
+}
+
+.report-video-slot p {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.policy-page {
+  max-width: 760px;
+  margin: var(--space-12) auto;
+  padding: 0 var(--space-6);
+  min-height: 65vh;
+}
+
+.policy-page h1 {
+  font-size: 2.5rem;
+}
+
+.policy-page h2 {
+  margin-top: var(--space-8);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.policy-notice {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.policy-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-8);
+}
+
+@media (max-width: 700px) {
+  .report-guide {
+    margin: var(--space-8) 0;
+    padding-top: var(--space-6);
+  }
+
+  .report-guide h2 {
+    font-size: 1.75rem;
+  }
+
+  .report-video-slot {
+    padding: var(--space-4);
+  }
+
+  .policy-page {
+    margin: var(--space-8) auto;
+  }
+
+  .policy-page h1 {
+    font-size: 2rem;
+  }
+}

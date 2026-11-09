@@ -12,13 +12,16 @@ export async function rateLimit(request: Request, action: string, email?: string
   const ip = raw?.trim();
   if (!ip || !isIP(ip)) throw new Error('Client address is unavailable.');
   const emailAction = ['forgot-password', 'resend'].includes(action);
-  const rules = [ { identity: `ip:${ip}:${action}`, limit: emailAction ? 10 : 30, seconds: 900 } ];
-  if (email) rules.push({ identity: `email:${email}:${action}`, limit: emailAction ? 1 : 8, seconds: emailAction ? 60 : 900 });
+  const profile = action === 'payment-status' ? { ip: 3000, account: 60, seconds: 60 }
+    : action === 'graph-save' ? { ip: 1200, account: 60, seconds: 900 }
+    : { ip: emailAction ? 10 : 30, account: emailAction ? 1 : 8, seconds: emailAction ? 60 : 900 };
+  const rules = [ { identity: `ip:${ip}:${action}`, limit: profile.ip, seconds: emailAction ? 900 : profile.seconds } ];
+  if (email) rules.push({ identity: `email:${email}:${action}`, limit: profile.account, seconds: profile.seconds });
   const db = adminSupabase();
   for (const rule of rules) {
     const key = createHmac('sha256', config().secret).update(rule.identity).digest('hex');
     const { data, error } = await db.rpc('consume_rate_limit', { p_key: key, p_limit: rule.limit, p_window_seconds: rule.seconds });
     if (error) throw new Error('Rate limiting is unavailable.');
-    if (data !== true) throw new RateLimitError('Too many attempts. Wait a little before trying again. Email requests can be sent once a minute.');
+    if (data !== true) throw new RateLimitError(emailAction ? 'Too many attempts. Email requests can be sent once a minute. Please wait before trying again.' : 'Too many requests. Wait a little before trying again.');
   }
 }
