@@ -34,6 +34,9 @@ export function AuthForm({
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [visiblePasswords, setVisiblePasswords] = useState<
+    Record<string, boolean>
+  >({});
   const messageRef = useRef<HTMLParagraphElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const touched = useRef(new Set<string>());
@@ -56,6 +59,45 @@ export function AuthForm({
   );
   const currentPassword = ["change-password", "delete-account"].includes(mode);
   const id = (name: string) => `${mode}-${name}`;
+  function passwordInput(
+    name: string,
+    options: React.InputHTMLAttributes<HTMLInputElement>,
+  ) {
+    const visible = Boolean(visiblePasswords[name]);
+    const label =
+      name === "currentPassword"
+        ? "current password"
+        : name === "confirmPassword"
+          ? "confirm password"
+          : newPassword && mode !== "signup"
+            ? "new password"
+            : "password";
+    return (
+      <div className="password-input">
+        <input
+          id={id(name)}
+          name={name}
+          {...options}
+          type={visible ? "text" : "password"}
+        />
+        <button
+          type="button"
+          className="password-toggle"
+          aria-label={`${visible ? "Hide" : "Show"} ${label}`}
+          aria-controls={id(name)}
+          aria-pressed={visible}
+          onClick={() =>
+            setVisiblePasswords((previous) => ({
+              ...previous,
+              [name]: !previous[name],
+            }))
+          }
+        >
+          {visible ? "Hide" : "Show"}
+        </button>
+      </div>
+    );
+  }
 
   function validateFields(form: HTMLFormElement, all = false) {
     const errors = authFieldErrors(
@@ -153,6 +195,7 @@ export function AuthForm({
       if (response.ok) {
         resetting.current = true;
         form.reset();
+        setVisiblePasswords({});
         setFieldErrors({});
         touched.current.clear();
         submitted.current = false;
@@ -196,15 +239,12 @@ export function AuthForm({
       {currentPassword && (
         <div className="field">
           <label htmlFor={id("currentPassword")}>Current password</label>
-          <input
-            id={id("currentPassword")}
-            name="currentPassword"
-            type="password"
-            autoComplete="current-password"
-            maxLength={128}
-            required
-            {...accessibility("currentPassword")}
-          />
+          {passwordInput("currentPassword", {
+            autoComplete: "current-password",
+            maxLength: 128,
+            required: true,
+            ...accessibility("currentPassword"),
+          })}
           {feedback("currentPassword")}
         </div>
       )}
@@ -213,28 +253,20 @@ export function AuthForm({
           <label htmlFor={id("password")}>
             {newPassword && mode !== "signup" ? "New password" : "Password"}
           </label>
-          <input
-            id={id("password")}
-            name="password"
-            type="password"
-            autoComplete={newPassword ? "new-password" : "current-password"}
-            minLength={newPassword ? 12 : undefined}
-            maxLength={128}
-            pattern={
-              newPassword
-                ? "(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{12,128}"
-                : undefined
-            }
-            {...accessibility(
-              "password",
-              newPassword ? id("rules") : undefined,
-            )}
-            required
-          />
+          {passwordInput("password", {
+            autoComplete: newPassword ? "new-password" : "current-password",
+            minLength: newPassword ? 8 : undefined,
+            maxLength: 128,
+            pattern: newPassword
+              ? "(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{8,128}"
+              : undefined,
+            ...accessibility("password", newPassword ? id("rules") : undefined),
+            required: true,
+          })}
           {feedback("password")}
           {newPassword && (
             <p className="hint" id={id("rules")}>
-              Use 12–128 characters, with an uppercase letter, a lowercase
+              Use at least 8 characters, with an uppercase letter, a lowercase
               letter and a number.
             </p>
           )}
@@ -243,16 +275,13 @@ export function AuthForm({
       {newPassword && (
         <div className="field">
           <label htmlFor={id("confirmPassword")}>Confirm password</label>
-          <input
-            id={id("confirmPassword")}
-            name="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            minLength={12}
-            maxLength={128}
-            required
-            {...accessibility("confirmPassword")}
-          />
+          {passwordInput("confirmPassword", {
+            autoComplete: "new-password",
+            minLength: 8,
+            maxLength: 128,
+            required: true,
+            ...accessibility("confirmPassword"),
+          })}
           {feedback("confirmPassword")}
         </div>
       )}

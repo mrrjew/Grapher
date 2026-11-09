@@ -12,6 +12,8 @@ describe('authentication input boundaries', () => {
     expect(() => passwordValue(password)).toThrow();
   });
   it('accepts a strong passphrase, preserves spaces and permits older login passwords', () => {
+    expect(passwordValue('Abcdefg1')).toBe('Abcdefg1');
+    expect(() => passwordValue('Abcdef1')).toThrow('at least 8');
     expect(passwordValue('Useful Lab Notes 17')).toBe('Useful Lab Notes 17');
     expect(passwordValue('old', false)).toBe('old');
   });

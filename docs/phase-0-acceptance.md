@@ -8,7 +8,7 @@ Local tests and mocks are useful regression checks, but this list requires real 
 
 - [ ] Migrations applied successfully. All application tables have RLS enabled.
 - [ ] Email confirmation is required in hosted Auth, including requests made directly to Supabase's public API.
-- [ ] Hosted password policy rejects passwords shorter than 12 characters or missing uppercase, lowercase or digits. Test direct provider requests as well as the UI.
+- [ ] Hosted password policy rejects passwords shorter than 8 characters or missing uppercase, lowercase or digits. Test direct provider requests as well as the UI.
 - [ ] Site URL, redirect allowlist, custom SMTP, token expiry, JWT expiry and security notifications match the README.
 - [ ] The app uses `sb_publishable_...` and `sb_secret_...` API keys. No secret API key, rate-limit secret, session token or password appears in client JavaScript, browser local storage or logs.
 - [ ] Ordinary anonymous and authenticated roles cannot read or modify internal rate-limit buckets or execute `consume_rate_limit()`.

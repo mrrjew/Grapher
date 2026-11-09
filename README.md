@@ -29,7 +29,7 @@ The application requires both migrations as well as the provider settings below.
 These dashboard settings are required; applying SQL migrations alone does not configure hosted Auth:
 
 1. Enable email/password authentication and require email confirmation. Disable unused authentication providers and anonymous sign-ins.
-2. Require at least 12 password characters, including uppercase letters, lowercase letters and digits. Enable leaked-password protection if your plan supports it.
+2. Require at least 8 password characters, including uppercase letters, lowercase letters and digits. Enable leaked-password protection if your plan supports it. Password fields include individual Show/Hide controls.
 3. Set JWT expiry to 900 seconds. Keep refresh-token rotation and reuse detection enabled.
 4. Set the Site URL to the exact `APP_ORIGIN`. Allow only the local development origin and actual deployed application origin as email redirect URLs. Remove broad production wildcards.
 5. Configure custom SMTP and test delivery. Supabase's default email service is restricted and is unsuitable for student sign-ups. Set a recognizable sender and configure the sender domain's SPF/DKIM records.

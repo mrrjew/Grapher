@@ -10,17 +10,18 @@ export function emailValue(value: unknown): string {
 }
 
 export function passwordValue(value: unknown, strong = true): string {
-  if (typeof value !== "string" || !value || value.length > 128)
-    throw new InputError("Enter a password of at most 128 characters.");
+  if (typeof value !== "string" || !value)
+    throw new InputError("Enter your password.");
+  if (value.length > 128) throw new InputError("Choose a shorter password.");
   if (
     strong &&
-    (value.length < 12 ||
+    (value.length < 8 ||
       !/[a-z]/.test(value) ||
       !/[A-Z]/.test(value) ||
       !/[0-9]/.test(value))
   )
     throw new InputError(
-      "Use 12–128 characters, with an uppercase letter, a lowercase letter and a number.",
+      "Use at least 8 characters, with an uppercase letter, a lowercase letter and a number.",
     );
   return value;
 }
