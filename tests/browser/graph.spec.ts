@@ -78,6 +78,17 @@ test("shows hand-worked scales and plotted points on a narrow screen", async ({
     page.getByRole("heading", { name: "Graph preview", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("img")).toBeVisible();
+  const editor = await page.locator(".graph-editor").boundingBox();
+  const output = await page.locator(".graph-results").boundingBox();
+  expect(editor).not.toBeNull();
+  expect(output).not.toBeNull();
+  if (page.viewportSize()!.width > 1050)
+    expect(output!.x).toBeGreaterThanOrEqual(editor!.x + editor!.width);
+  else expect(output!.y).toBeGreaterThanOrEqual(editor!.y + editor!.height);
+  const previewJump = page.getByRole("link", { name: "View graph preview" });
+  await previewJump.focus();
+  await previewJump.press("Enter");
+  await expect(page.locator("#graph-preview")).toBeFocused();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

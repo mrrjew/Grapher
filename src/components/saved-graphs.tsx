@@ -206,47 +206,51 @@ export function SavedGraphs({
       aria-labelledby="saved-title"
       aria-busy={busy}
     >
-      <h3 id="saved-title">Saved graphs</h3>
-      <p className="hint">
-        {paid
-          ? "Your semester pass allows unlimited saved graphs."
-          : "Your free account can keep one saved graph. You can update it whenever you need."}
-      </p>
-      <div className="graph-actions">
-        <button
-          type="button"
-          className="button"
-          onClick={save}
-          disabled={busy || !ready}
-        >
-          Save graph
-        </button>
-        <button
-          type="button"
-          className="button secondary"
-          disabled={busy}
-          onClick={() => {
-            if (
-              window.confirm(
-                "Start a new graph and replace this browser’s draft? Saved graphs will stay online.",
-              )
-            ) {
-              select(null);
-              onLoad(emptyDraft());
-              setMessage("New graph started.");
-            }
-          }}
-        >
-          New graph
-        </button>
-        <button
-          type="button"
-          className="button secondary"
-          disabled={busy}
-          onClick={() => action(() => refresh())}
-        >
-          Refresh saved graphs
-        </button>
+      <div className="saved-heading">
+        <div>
+          <h3 id="saved-title">Saved graphs</h3>
+          <p className="hint">
+            {paid
+              ? "Your semester pass allows unlimited saved graphs."
+              : "Your free account can keep one saved graph. You can update it whenever you need."}
+          </p>
+        </div>
+        <div className="graph-actions">
+          <button
+            type="button"
+            className="button"
+            onClick={save}
+            disabled={busy || !ready}
+          >
+            Save graph
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={busy}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Start a new graph and replace this browser’s draft? Saved graphs will stay online.",
+                )
+              ) {
+                select(null);
+                onLoad(emptyDraft());
+                setMessage("New graph started.");
+              }
+            }}
+          >
+            New graph
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={busy}
+            onClick={() => action(() => refresh())}
+          >
+            Refresh saved graphs
+          </button>
+        </div>
       </div>
       {message && (
         <p

@@ -62,7 +62,7 @@ test("saving preserves edits and retries the same identifier after failure", asy
 
 test("loading a saved graph restores labels, rows and chosen boxes", async ({
   page,
-}) => {
+}, testInfo) => {
   page.on("dialog", (dialog) => dialog.accept());
   await page.route("**/api/graphs?offset=0", (route) =>
     route.fulfill({
@@ -97,6 +97,9 @@ test("loading a saved graph restores labels, rows and chosen boxes", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await page
+    .locator(".saved-graphs")
+    .screenshot({ path: testInfo.outputPath("saved-graphs.png") });
 });
 
 test("loading does not silently overwrite measurements typed during the request", async ({

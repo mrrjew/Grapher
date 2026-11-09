@@ -106,7 +106,12 @@ export function GraphPreview({
   }, [title, xLabel, yLabel, points, x, y]);
 
   return (
-    <section className="graph-preview" aria-labelledby="preview-title">
+    <section
+      id="graph-preview"
+      tabIndex={-1}
+      className="graph-preview"
+      aria-labelledby="preview-title"
+    >
       <h3 id="preview-title">Graph preview</h3>
       <p>
         Copy the axes and points onto your graph paper. Each grid line is one
@@ -119,11 +124,15 @@ export function GraphPreview({
           available. Try showing the preview again.
         </p>
       )}
+      <p className="hint preview-scroll-hint" id="preview-scroll-help">
+        Scroll sideways to see the full graph on a small screen.
+      </p>
       <div
         className="preview-scroll"
         tabIndex={0}
         role="region"
         aria-label="Graph preview scroll area"
+        aria-describedby="preview-scroll-help"
       >
         <div className="preview-canvas">
           <canvas

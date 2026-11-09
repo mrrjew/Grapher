@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { configured } from "@/lib/config";
 import { authenticatedUser } from "@/lib/supabase";
-import { hasSemesterPass } from "@/lib/access";
+import { semesterAccessForPage } from "@/lib/access";
 import { semester } from "@/lib/semester";
 import { CheckoutButton } from "@/components/checkout-button";
 
@@ -10,7 +10,9 @@ export default async function Upgrade() {
   if (!configured()) redirect("/login");
   const auth = await authenticatedUser();
   if (!auth) redirect("/login");
-  const paid = await hasSemesterPass(auth.client);
+  const access = await semesterAccessForPage(auth.client);
+  if (!access.available) return <main id="main" className="narrow-page"><h1>Semester access is unavailable</h1><p>We could not check your current pass. Checkout is paused until that check is available. You can still use the graph helper.</p><Link href="/workspace">Back to graph helper</Link></main>;
+  const paid = access.paid;
   return (
     <main id="main" className="narrow-page">
       <p className="section-label">Semester pass</p>
